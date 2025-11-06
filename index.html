@@ -5,117 +5,54 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Unity WebGL Player | Cashaloe Attached AR</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <!-- Removed external style.css to manage all styling here -->
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        overflow: hidden; /* Hide scrollbars */
-        width: 100%;
-        height: 100%;
-        background-color: #000; /* Set a black background for the page */
-        display: flex; /* Use flexbox for centering */
-        justify-content: center; /* Center horizontally */
-        align-items: center; /* Center vertically */
-        position: fixed; /* Fix to viewport */
-        top: 0;
-        left: 0;
-      }
-
-      #unity-container {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        /* Ensure the container doesn't overflow */
-        max-width: 100vw;
-        max-height: 100vh;
-        /* Force portrait aspect ratio for the container if needed,
-           or let the canvas handle it more directly */
-        /* aspect-ratio: 9 / 16; /* If you want the container itself to be portrait */
-      }
-
-      #unity-canvas {
-        width: 100%;
-        height: 100%;
-        /* Force portrait aspect ratio and make it fit the container */
-        aspect-ratio: 9 / 16; /* Set desired portrait aspect ratio (e.g., 9:16) */
-        object-fit: contain; /* Scales the content to fit within the container while preserving its aspect ratio */
-        background: #231F20; /* Default Unity background, can be adjusted */
-      }
-
-      #unity-loading-bar {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        width: 200px; /* Adjust loading bar size if needed */
-        height: 20px;
-        display: none; /* Will be shown by JS */
-      }
-      #unity-logo {
-        width: 100%;
-        height: 100%;
-        background: url('TemplateData/unity-logo-dark.png') no-repeat center; /* Adjust logo path */
-        background-size: contain;
-      }
-      #unity-progress-bar-empty {
-        background-color: #333;
-        height: 10px;
-        margin-top: 5px;
-        border-radius: 5px;
-      }
-      #unity-progress-bar-full {
-        background-color: #eee;
-        height: 100%;
-        width: 0%;
-        border-radius: 5px;
-      }
-
-      #unity-warning,
-      #unity-footer {
-        display: none; /* Hide Unity's default warning and footer for borderless experience */
-      }
-      #unity-fullscreen-button {
-          display: none; /* Ensure the default fullscreen button is hidden */
-      }
-    </style>
+    <link rel="stylesheet" href="TemplateData/style.css">
   </head>
   <body>
-    <div id="unity-container">
-      <canvas id="unity-canvas"></canvas>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width=960 height=600></canvas>
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
           <div id="unity-progress-bar-full"></div>
         </div>
       </div>
-      <!-- Removed #unity-warning and #unity-footer as they are hidden by CSS -->
+      <div id="unity-warning"> </div>
+      <div id="unity-footer">
+        <div id="unity-webgl-logo"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">Cashaloe Attached AR</div>
+      </div>
     </div>
     <script>
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
       var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      // Removed fullscreenButton as we'll handle fullscreen via body click
-      var warningBanner = document.querySelector("#unity-warning"); // Still keep it in JS for potential debug messages, but hidden by CSS
+      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      var warningBanner = document.querySelector("#unity-warning");
 
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
       function unityShowBanner(msg, type) {
-        // Since unity-warning is display: none in CSS, this won't show visually
-        // but can be uncommented for debugging if needed.
-        // var div = document.createElement('div');
-        // div.innerHTML = msg;
-        // warningBanner.appendChild(div);
-        // if (type == 'error') div.style = 'background: red; padding: 10px;';
-        // else {
-        //   if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-        //   setTimeout(function() {
-        //     warningBanner.removeChild(div);
-        //   }, 5000);
-        // }
-        console.warn("Unity Banner Message:", msg, type); // Log to console instead
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
       }
 
       var buildUrl = "Build";
@@ -129,16 +66,36 @@
         productName: "Cashaloe Attached AR",
         productVersion: "1.0",
         showBanner: unityShowBanner,
-        // Set canvas width/height to match the desired aspect ratio in Unity's render target
-        // If your Unity project is already set to a portrait resolution (e.g., 600x960),
-        // remove the width/height attributes from the canvas element above and let Unity scale.
-        // Or set them here if you want to override. For now, removed from canvas element.
-        // unity will handle setting the canvas size based on its internal resolution.
       };
 
-      // Ensure canvas matches the window size for optimal scaling
-      // and let the CSS handle the aspect ratio and centering.
-      // Removed the desktop/mobile specific width/height settings from JS.
+      // By default, Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        container.className = "unity-mobile";
+        canvas.className = "unity-mobile";
+
+        // To lower canvas resolution on mobile devices to gain some
+        // performance, uncomment the following line:
+        // config.devicePixelRatio = 1;
+
+        unityShowBanner('WebGL builds are not supported on mobile devices.');
+      } else {
+        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+
+        canvas.style.width = "960px";
+        canvas.style.height = "600px";
+      }
 
       loadingBar.style.display = "block";
 
@@ -149,14 +106,9 @@
           progressBarFull.style.width = 100 * progress + "%";
         }).then((unityInstance) => {
           loadingBar.style.display = "none";
-          // Automatically go fullscreen on the first user interaction (click)
-          document.body.addEventListener('click', function requestFullscreenOnce() {
-            if (document.fullscreenElement === null) {
-              unityInstance.SetFullscreen(1);
-            }
-            // Remove the event listener after the first click
-            document.body.removeEventListener('click', requestFullscreenOnce);
-          }, { once: true }); // Ensure it only runs once
+          fullscreenButton.onclick = () => {
+            unityInstance.SetFullscreen(1);
+          };
         }).catch((message) => {
           alert(message);
         });
